@@ -2,12 +2,27 @@ import urllib2
 import bs4
 import json
 import time
+import sys
 
 def urlToSoup(url):
 	req = urllib2.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
 	html = urllib2.urlopen(req).read()
 	soup = bs4.BeautifulSoup(html, "html5lib")
 	return soup
+
+
+def gamePrint(stream, title, releaseDate, price, discountedPrice, discount, review, platforms):
+	stream.write(title.encode("utf-8") + "\n")
+	stream.write(releaseDate.encode("utf-8") + "\n")
+	stream.write("Price: " + price.encode("utf-8") + "\n")
+	if price != discountedPrice:
+		stream.write("Discounted Price: " + discountedPrice.encode("utf-8") + "\n")
+		stream.write("Discount: " + discount.encode("utf-8") + "\n")
+	stream.write(review.encode("utf-8") + "\n")
+	stream.write("Platforms:\n")
+	for platform in platforms:
+		stream.write(' ' + platform["class"][1].encode("utf-8") + "\n")
+	stream.write("\n")
 
 
 def scrapeVals(game):
@@ -40,30 +55,9 @@ def scrapeVals(game):
 		count = review[1].split(" of the ")[1].split(" user reviews ")[0]
 		review = overall + ", " + percent + ", " + count + " reviews"
 
-	print title
-	print releaseDate
-	print "Price: " + price
-	if price != discountedPrice:
-		print "Discounted Price: " + discountedPrice
-		print "Discount: " + discount
-	print review
-	print "Platforms:"
-	for platform in platforms:
-		print ' ' + platform["class"][1]
-	print ""
-
 	global output
-	output.write(title.encode("utf-8") + "\n")
-	output.write(releaseDate.encode("utf-8") + "\n")
-	output.write("Price: " + price.encode("utf-8") + "\n")
-	if price != discountedPrice:
-		output.write("Discounted Price: " + discountedPrice.encode("utf-8") + "\n")
-		output.write("Discount: " + discount.encode("utf-8") + "\n")
-	output.write(review.encode("utf-8") + "\n")
-	output.write("Platforms:\n")
-	for platform in platforms:
-		output.write(' ' + platform["class"][1].encode("utf-8") + "\n")
-	output.write("\n")
+	gamePrint(sys.stdout, title, releaseDate, price, discountedPrice, discount, review, platforms)
+	gamePrint(output, title, releaseDate, price, discountedPrice, discount, review, platforms)
 
 
 def getPageGames(url):
@@ -75,6 +69,7 @@ def getPageGames(url):
 	for game in pageGames:
 		scrapeVals(game)
 		games.append(game)
+
 
 games = []
 baseUrl = "http://store.steampowered.com/search/?page="
