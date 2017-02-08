@@ -3,10 +3,6 @@ import bs4
 import json
 import time
 
-games = []
-pageCount = 1080
-basePage = "http://store.steampowered.com/search/?page="
-
 def urlToSoup(url):
 	req = urllib2.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
 	html = urllib2.urlopen(req).read()
@@ -53,8 +49,21 @@ def scrapeVals(game):
 	print review
 	print "Platforms:"
 	for platform in platforms:
-		print platform["class"][1]
+		print ' ' + platform["class"][1]
 	print ""
+
+	global output
+	output.write(title.encode("utf-8") + "\n")
+	output.write(releaseDate.encode("utf-8") + "\n")
+	output.write("Price: " + price.encode("utf-8") + "\n")
+	if price != discountedPrice:
+		output.write("Discounted Price: " + discountedPrice.encode("utf-8") + "\n")
+		output.write("Discount: " + discount.encode("utf-8") + "\n")
+	output.write(review.encode("utf-8") + "\n")
+	output.write("Platforms:\n")
+	for platform in platforms:
+		output.write(' ' + platform["class"][1].encode("utf-8") + "\n")
+	output.write("\n")
 
 
 def getPageGames(url):
@@ -67,10 +76,16 @@ def getPageGames(url):
 		scrapeVals(game)
 		games.append(game)
 
+games = []
+baseUrl = "http://store.steampowered.com/search/?page="
+baseSoup = urlToSoup(baseUrl)
+pageCount = int(baseSoup.findAll("div", {"class" : "search_pagination_right"})[0].findAll("a")[2].text)
 
+output = open("games.txt", "wb")
 for i in range(1, pageCount + 1):
-	link = basePage + str(i)
+	link = baseUrl + str(i)
 	getPageGames(link)
+output.close()
 
 file = open("data.txt", "wb")
 for game in games:
