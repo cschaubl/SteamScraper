@@ -6,6 +6,7 @@ import sys
 class Game():
 	def __init__(self):
 		self.title = None
+		self.url = None
 		self.releaseDate = None
 		self.price = None
 		self.discountedPrice = None
@@ -18,6 +19,7 @@ class Game():
 
 	def printData(self, stream):
 		stream.write(self.title.encode("utf-8") + "\n")
+		stream.write(self.url.encode("utf-8") + "\n")
 		stream.write(self.releaseDate.encode("utf-8") + "\n")
 		stream.write("Price: " + self.price.encode("utf-8") + "\n")
 		if self.discount != None:
@@ -40,6 +42,7 @@ def scrapeVals(page):
 	game = Game()
 
 	game.title = page.findAll("span", {"class" : "title"})[0].text
+	game.url = page.get("href")
 	game.releaseDate = page.findAll("div", {"class" : "search_released"})[0].text
 	game.platforms = []
 	platforms = page.findAll("p")[0].findAll("span")
