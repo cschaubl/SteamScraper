@@ -1,8 +1,33 @@
 import urllib2
 import bs4
 import json
-import time
 import sys
+
+class Game():
+	def __init__(self):
+		self.title = None
+		self.releaseDate = None
+		self.price = None
+		self.discountedPrice = None
+		self.discount = None
+		self.review = None
+		self.platforms = None
+
+	def __getitem__(self, key):
+		return self.key
+
+	def printData(self, stream):
+		stream.write(self.title.encode("utf-8") + "\n")
+		stream.write(self.releaseDate.encode("utf-8") + "\n")
+		stream.write("Price: " + self.price.encode("utf-8") + "\n")
+		if self.discount != None:
+			stream.write("Discounted Price: " + self.discountedPrice.encode("utf-8") + "\n")
+			stream.write("Discount: " + self.discount.encode("utf-8") + "\n")
+		stream.write(self.review.encode("utf-8") + "\n")
+		stream.write("Platforms:\n")
+		for platform in self.platforms:
+			stream.write(' ' + platform.encode("utf-8") + "\n")
+		stream.write("\n")
 
 def urlToSoup(url):
 	req = urllib2.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -10,79 +35,62 @@ def urlToSoup(url):
 	soup = bs4.BeautifulSoup(html, "html5lib")
 	return soup
 
+def scrapeVals(page):
+	global games
+	game = Game()
 
-def gamePrint(stream, title, releaseDate, price, discountedPrice, discount, review, platforms):
-	stream.write(title.encode("utf-8") + "\n")
-	stream.write(releaseDate.encode("utf-8") + "\n")
-	stream.write("Price: " + price.encode("utf-8") + "\n")
-	if price != discountedPrice:
-		stream.write("Discounted Price: " + discountedPrice.encode("utf-8") + "\n")
-		stream.write("Discount: " + discount.encode("utf-8") + "\n")
-	stream.write(review.encode("utf-8") + "\n")
-	stream.write("Platforms:\n")
+	game.title = page.findAll("span", {"class" : "title"})[0].text
+	game.releaseDate = page.findAll("div", {"class" : "search_released"})[0].text
+	game.platforms = []
+	platforms = page.findAll("p")[0].findAll("span")
 	for platform in platforms:
-		stream.write(' ' + platform["class"][1].encode("utf-8") + "\n")
-	stream.write("\n")
+		game.platforms.append(platform["class"][1])
 
-
-def scrapeVals(game):
-	title = game.findAll("span", {"class" : "title"})[0].text
-	releaseDate = game.findAll("div", {"class" : "search_released"})[0].text
-	platforms = game.findAll("p")[0].findAll("span")
-	plats = ["win", "mac", "linux", "razerosvr", "htcvive", "oculusrift", "hmd_separator", "streamingvideo"]
-
-	prices = game.findAll("div", {"class" : "search_price"})[0]
+	prices = page.findAll("div", {"class" : "search_price"})[0]
 	if len(prices) == 1:
-		price = prices.text[9:-7]
-		discountedPrice = price
+		game.price = prices.text[9:-7]
 	if len(prices) == 4:
-		price = "$" + prices.text.split("$")[1]
-		discountedPrice = "$" + prices.text.split("$")[2]
-
-	discount = game.findAll("div" , {"class" : "search_discount"})[0]
-	if len(discount) == 3:
-		discount = discount.text[9:-8]
-	if len(discount) == 1:
-		discount = "-0%"
-
-	review = game.findAll("span", {"class" : "search_review_summary"})
+		game.price = "$" + prices.text.split("$")[1]
+		game.discountedPrice = "$" + prices.text.split("$")[2]
+		game.discount = page.findAll("div" , {"class" : "search_discount"})[0].text[9:-8]
+	
+	review = page.findAll("span", {"class" : "search_review_summary"})
 	if len(review) == 0:
-		review = "No reviews"
+		game.review = "No reviews"
 	else:
 		review = str(review[0]).split('data-store-tooltip="')[1].split(">")[0].split("&lt;br&gt;")
 		overall = review[0]
 		percent = review[1].split(" of the ")[0]
 		count = review[1].split(" of the ")[1].split(" user reviews ")[0]
-		review = overall + ", " + percent + ", " + count + " reviews"
+		game.review = overall + ", " + percent + ", " + count
 
-	global output
-	gamePrint(sys.stdout, title, releaseDate, price, discountedPrice, discount, review, platforms)
-	gamePrint(output, title, releaseDate, price, discountedPrice, discount, review, platforms)
-
+	games.append(game)
+	#game.printData(sys.stdout)
 
 def getPageGames(url):
-	global games
 	page = urlToSoup(url)
 	searchResults = page.findAll("div", {"id" : "search_result_container"})[0]
 	divs = searchResults.findAll("div")[1]
 	pageGames = divs.findAll("a")
-	for game in pageGames:
-		scrapeVals(game)
-		games.append(game)
-
+	for pageGame in pageGames:
+		scrapeVals(pageGame)
 
 games = []
+outputFile = "games.txt"
 baseUrl = "http://store.steampowered.com/search/?page="
 baseSoup = urlToSoup(baseUrl)
 pageCount = int(baseSoup.findAll("div", {"class" : "search_pagination_right"})[0].findAll("a")[2].text)
 
-output = open("games.txt", "wb")
-for i in range(1, pageCount + 1):
-	link = baseUrl + str(i)
+for i in range(pageCount):
+	page = i + 1
+	link = baseUrl + str(page)
 	getPageGames(link)
-output.close()
-
-file = open("data.txt", "wb")
+	sys.stdout.write("Processed pages: %d / %d\r" % (page, pageCount))
+	sys.stdout.flush()
+print ""
+file = open(outputFile, "wb")
+print "Writing game data to " + outputFile
 for game in games:
-	file.write(game.prettify().encode("utf-8") + "\n")
+	game.printData(file)
+
 file.close()
