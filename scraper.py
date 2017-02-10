@@ -5,6 +5,12 @@ import sys
 import time
 import sqlite3
 
+def nonePrint(val):
+	if val is None:
+		return ""
+	else:
+		return val
+
 class Game():
 	def __init__(self):
 		self.title = None
@@ -20,27 +26,28 @@ class Game():
 		return self.key
 
 	def printData(self, stream):
-		stream.write(self.title.encode("utf-8") + "\n")
-		stream.write(self.url.encode("utf-8") + "\n")
-		stream.write(self.releaseDate.encode("utf-8") + "\n")
-		stream.write("Price: " + self.price.encode("utf-8") + "\n")
-		if self.discount != None:
-			stream.write("Discounted Price: " + self.discountedPrice.encode("utf-8") + "\n")
-			stream.write("Discount: " + self.discount.encode("utf-8") + "\n")
-		stream.write(self.review.encode("utf-8") + "\n")
+		stream.write("Title: " + nonePrint(self.title).encode("utf-8") + "\n")
+		stream.write("Url: " + nonePrint(self.url).encode("utf-8") + "\n")
+		stream.write("ReleaseDate: " + nonePrint(self.releaseDate).encode("utf-8") + "\n")
+		stream.write("Price: " + nonePrint(self.price).encode("utf-8") + "\n")
+		stream.write("Discounted Price: " + nonePrint(self.discountedPrice).encode("utf-8") + "\n")
+		stream.write("Discount: " + nonePrint(self.discount).encode("utf-8") + "\n")
+		stream.write("Review: " + nonePrint(self.review).encode("utf-8") + "\n")
 		stream.write("Platforms:\n")
 		for platform in self.platforms:
-			stream.write(' ' + platform.encode("utf-8") + "\n")
+			stream.write(' ' + nonePrint(platform.encode)("utf-8") + "\n")
 		stream.write("\n")
 
 	def toSQL(self, table):
 		title = self.title
 		url = self.url
+		"""
 		month = int(time.strptime(self.releaseDate.split(" ")[0], "%b").tm_mon)
 		day = int(self.releaseDate.split(" ")[1].replace(",", ""))
 		year = int(self.releaseDate.split(" ")[2])
-		quality = self.review.split(", ")[0]
 		releaseDate = str("%04d-%02d-%02d" % (year, month, day))
+		"""
+		quality = self.review.split(", ")[0]
 		if self.review != "No reviews":
 			reviewPercent = int(self.review.split(", ")[1].replace("%", ""))
 			reviewCount = int(self.review.split(", ")[2].replace(",", ""))
@@ -51,14 +58,7 @@ class Game():
 		for platform in self.platforms:
 			platforms += platform + ","
 		platforms = platforms[:-1]
-		price = self.price.replace("$", "")
-		if self.discount is not None:
-			discountedPrice = self.discountedPrice.replace("$", "")
-			discount = self.discount.replace("-", "").replace("%", "")
-		else:
-			discountedPrice = None
-			discount = None
-		table.execute("INSERT INTO games (title, url, releaseDate, price, discountedPrice, discount, quality, reviewCount, reviewPercent, platforms) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (title, url, releaseDate, price, discountedPrice, discount, quality, reviewCount, reviewPercent, platforms))
+		table.execute("INSERT INTO games (title, url, releaseDate, price, discountedPrice, discount, quality, reviewCount, reviewPercent, platforms) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (title, url, self.releaseDate, self.price, self.discountedPrice, self.discount, quality, reviewCount, reviewPercent, platforms))
 
 def urlToSoup(url):
 	req = urllib2.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -78,15 +78,16 @@ def scrapeVals(page):
 		platforms = page.findAll("p")[0].findAll("span")
 		for platform in platforms:
 			game.platforms.append(platform["class"][1].strip())
-
 		prices = page.findAll("div", {"class" : "search_price"})[0]
-		if len(prices) == 1:
+		if len(page.findAll("div", {"class" : "discounted"})) == 0:
+			isDiscounted = False
 			game.price = prices.text.strip()
-		if len(prices) == 4:
+		else:
+			isDiscounted = True
 			game.price = prices.findAll("strike")[0].text.strip()
-			game.discountedPrice = prices.text.strip()[len(game.price):]
 			game.discount = page.findAll("div" , {"class" : "search_discount"})[0].text.strip()
-		
+			game.discountedPrice = prices.text.strip()[len(game.price):]
+
 		review = page.findAll("span", {"class" : "search_review_summary"})
 		if len(review) == 0:
 			game.review = "No reviews"
@@ -98,7 +99,7 @@ def scrapeVals(page):
 			game.review = overall + ", " + percent + ", " + count
 
 		games.append(game)
-		#game.printData(sys.stdout)
+		game.printData(sys.stdout)
 	except:
 		global broken
 		broken.append(page)
@@ -120,7 +121,7 @@ baseUrl = "http://store.steampowered.com/search/?page="
 baseSoup = urlToSoup(baseUrl)
 pageCount = int(baseSoup.findAll("div", {"class" : "search_pagination_right"})[0].findAll("a")[2].text)
 
-for i in range(1):
+for i in range(pageCount):
 	page = i + 1
 	link = baseUrl + str(page)
 	getPageGames(link)
