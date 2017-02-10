@@ -1,13 +1,20 @@
 import urllib2
 import bs4
-import json
 import sys
 import time
 import sqlite3
+import datetime
+import os
 
 def nonePrint(val):
 	if val is None:
 		return ""
+	else:
+		return val
+
+def nullCheck(val):
+	if val == "":
+		return None
 	else:
 		return val
 
@@ -21,9 +28,6 @@ class Game():
 		self.discount = None
 		self.review = None
 		self.platforms = None
-
-	def __getitem__(self, key):
-		return self.key
 
 	def printData(self, stream):
 		stream.write("Title: " + nonePrint(self.title).encode("utf-8") + "\n")
@@ -39,8 +43,14 @@ class Game():
 		stream.write("\n")
 
 	def toSQL(self, table):
-		title = self.title
-		url = self.url
+		title = nullCheck(self.title)
+		url = nullCheck(self.url)
+		releaseDate = nullCheck(self.releaseDate)
+		price = nullCheck(self.price)
+		discountedPrice = nullCheck(self.discountedPrice)
+		discount = nullCheck(self.discount)
+		if discount is not None:
+			discount = int(discount[1:-1])
 		"""
 		month = int(time.strptime(self.releaseDate.split(" ")[0], "%b").tm_mon)
 		day = int(self.releaseDate.split(" ")[1].replace(",", ""))
@@ -48,17 +58,18 @@ class Game():
 		releaseDate = str("%04d-%02d-%02d" % (year, month, day))
 		"""
 		quality = self.review.split(", ")[0]
-		if self.review != "No reviews":
-			reviewPercent = int(self.review.split(", ")[1].replace("%", ""))
-			reviewCount = int(self.review.split(", ")[2].replace(",", ""))
-		else:
+		if self.review == "No reviews":
 			reviewPercent = None
 			reviewCount = None
+		else:
+			reviewPercent = int(self.review.split(", ")[1].replace("%", ""))
+			reviewCount = int(self.review.split(", ")[2].replace(",", ""))
 		platforms = ""
 		for platform in self.platforms:
 			platforms += platform + ","
 		platforms = platforms[:-1]
-		table.execute("INSERT INTO games (title, url, releaseDate, price, discountedPrice, discount, quality, reviewCount, reviewPercent, platforms) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (title, url, self.releaseDate, self.price, self.discountedPrice, self.discount, quality, reviewCount, reviewPercent, platforms))
+		platforms = nullCheck(platforms)
+		table.execute("INSERT INTO games (title, url, releaseDate, price, discountedPrice, discount, quality, reviewCount, reviewPercent, platforms) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (title, url, releaseDate, price, discountedPrice, discount, quality, reviewCount, reviewPercent, platforms))
 
 def urlToSoup(url):
 	req = urllib2.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -99,7 +110,7 @@ def scrapeVals(page):
 			game.review = overall + ", " + percent + ", " + count
 
 		games.append(game)
-		game.printData(sys.stdout)
+		#game.printData(sys.stdout)
 	except:
 		global broken
 		broken.append(page)
@@ -117,10 +128,16 @@ def getPageGames(url):
 games = []
 broken = []
 outputFile = "games.txt"
-baseUrl = "http://store.steampowered.com/search/?page="
+outputDatabase = "games.db"
+baseUrl = "http://store.steampowered.com/search/?sort_by=Name_ASC&page="
 baseSoup = urlToSoup(baseUrl)
 pageCount = int(baseSoup.findAll("div", {"class" : "search_pagination_right"})[0].findAll("a")[2].text)
 
+if os.path.exists(outputDatabase):
+	print "File " + outputDatabase + " exists in directory, please delete before running"
+	sys.exit(1)
+
+start = datetime.datetime.now()
 for i in range(pageCount):
 	page = i + 1
 	link = baseUrl + str(page)
@@ -128,8 +145,10 @@ for i in range(pageCount):
 	sys.stdout.write("Processed pages: %d / %d\r" % (page, pageCount))
 	sys.stdout.flush()
 print ""
+end = datetime.datetime.now()
+print "Data scraped in " + str((end - start).seconds) + " seconds"
 
-conn = sqlite3.connect("example.db")
+conn = sqlite3.connect(outputDatabase)
 table = conn.cursor()
 table.execute('create table games \
 	(id integer primary key, \
