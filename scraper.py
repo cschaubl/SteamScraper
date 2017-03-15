@@ -177,7 +177,7 @@ if os.path.exists(outputDatabase):
 
 start = datetime.datetime.now()
 #begin itterating over all pages
-for i in range(10):
+for i in range(pageCount):
 	#create url by appending page number
 	page = i + 1
 	link = baseUrl + str(page)
