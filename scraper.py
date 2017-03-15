@@ -177,7 +177,7 @@ if os.path.exists(outputDatabase):
 
 start = datetime.datetime.now()
 #begin itterating over all pages
-for i in range(pageCount):
+for i in range(10):
 	#create url by appending page number
 	page = i + 1
 	link = baseUrl + str(page)
@@ -220,7 +220,7 @@ for game in games:
 file.close()
 conn.commit()
 conn.close()
-#dumb game to serialized file
+#dump game to serialized file
 print "Writing raw data to " + outputDump + " file"
 pickle.dump(games, open(outputDump, "wb"))
 #if errors print urls that caused error
