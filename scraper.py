@@ -6,6 +6,21 @@ import sqlite3
 import sys
 import urllib2
 
+def retry(limit):
+	def retryWrapper(func):
+		def functionWrapper(*args, **kwargs):
+			attempts = 0
+			while attempts < limit:
+				try:
+					rtnVal = func(*args, **kwargs)
+					return rtnVal
+				except:
+					attempts += 1
+			print "Too many failed attempts"
+			sys.exit(0)
+		return functionWrapper
+	return retryWrapper
+
 #print nothing if value is None
 def nonePrint(val):
 	if val is None:
@@ -93,6 +108,7 @@ class Game():
 		table.execute("INSERT INTO games (title, url, appID, type, releaseDate, fullPrice, currentPrice, discount, quality, reviewCount, reviewPercent, platforms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (title, url, appID, itemType, releaseDate, fullPrice, currentPrice, discount, quality, reviewCount, reviewPercent, platforms))
 
 #create soup from url
+@retry(5)
 def urlToSoup(url):
 	req = urllib2.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
 	html = urllib2.urlopen(req).read()
@@ -102,52 +118,46 @@ def urlToSoup(url):
 #get game values from page entry
 def scrapeVals(page):
 	#page causes an error save the url in broken and continue
-	try:
-		game = Game()
-		#scrape data from page
-		game.title = page.findAll("span", {"class" : "title"})[0].text.strip()
-		game.url = page.get("href").split("?")[0].strip()
-		game.appID = game.url.split("/")[-2]
-		game.itemType = game.url.split("/")[-3]
-		game.releaseDate = page.findAll("div", {"class" : "search_released"})[0].text.strip()
-		#store platforms in list
-		game.platforms = []
-		platforms = page.findAll("p")[0].findAll("span")
-		for platform in platforms:
-			game.platforms.append(platform["class"][1].strip())
-		#get all price text as string
-		prices = page.findAll("div", {"class" : "search_price"})[0]
-		#check if game has a discount
-		if len(page.findAll("div", {"class" : "discounted"})) == 0:
-			#if no discount full price is only result
-			game.fullPrice = prices.text.strip()
-		else:
-			#if discount parse values from price entry
-			game.fullPrice = prices.findAll("strike")[0].text.strip()
-			game.discount = page.findAll("div" , {"class" : "search_discount"})[0].text.strip()
-			game.currentPrice = prices.text.strip()[len(game.fullPrice):]
-		#get review string from page
-		review = page.findAll("span", {"class" : "search_review_summary"})
-		if len(review) == 0:
-			#if no review store "No reviews"
-			game.review = "No reviews"
-		else:
-			#if review parse data from review string
-			review = str(review[0]).split('data-store-tooltip="')[1].split(">")[0].split("&lt;br&gt;")
-			overall = review[0].strip()
-			percent = review[1].split(" of the ")[0].strip()
-			count = review[1].split(" of the ")[1].split(" user reviews ")[0].strip().replace(",", "")
-			#concatenate parameters into comma separated string 
-			game.review = overall + ", " + percent + ", " + count
+	game = Game()
+	#scrape data from page
+	game.title = page.findAll("span", {"class" : "title"})[0].text.strip()
+	game.url = page.get("href").split("?")[0].strip()
+	game.appID = game.url.split("/")[-2]
+	game.itemType = game.url.split("/")[-3]
+	game.releaseDate = page.findAll("div", {"class" : "search_released"})[0].text.strip()
+	#store platforms in list
+	game.platforms = []
+	platforms = page.findAll("p")[0].findAll("span")
+	for platform in platforms:
+		game.platforms.append(platform["class"][1].strip())
+	#get all price text as string
+	prices = page.findAll("div", {"class" : "search_price"})[0]
+	#check if game has a discount
+	if len(page.findAll("div", {"class" : "discounted"})) == 0:
+		#if no discount full price is only result
+		game.fullPrice = prices.text.strip()
+	else:
+		#if discount parse values from price entry
+		game.fullPrice = prices.findAll("strike")[0].text.strip()
+		game.discount = page.findAll("div" , {"class" : "search_discount"})[0].text.strip()
+		game.currentPrice = prices.text.strip()[len(game.fullPrice):]
+	#get review string from page
+	review = page.findAll("span", {"class" : "search_review_summary"})
+	if len(review) == 0:
+		#if no review store "No reviews"
+		game.review = "No reviews"
+	else:
+		#if review parse data from review string
+		review = str(review[0]).split('data-store-tooltip="')[1].split(">")[0].split("&lt;br&gt;")
+		overall = review[0].strip()
+		percent = review[1].split(" of the ")[0].strip()
+		count = review[1].split(" of the ")[1].split(" user reviews ")[0].strip().replace(",", "")
+		#concatenate parameters into comma separated string 
+		game.review = overall + ", " + percent + ", " + count
 
-		#store game object into list
-		global games
-		games.append(game)
-		#game.printData(sys.stdout)
-	except:
-		global broken
-		broken.append(page)
-		print page.get("href")
+	#store game object into list
+	global games
+	games.append(game)
 
 #get game entries from a search result page
 def getPageGames(url):
